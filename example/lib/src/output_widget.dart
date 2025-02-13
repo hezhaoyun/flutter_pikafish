@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class OutputWidget extends StatefulWidget {
   final Stream<String> stdout;
 
-  const OutputWidget(this.stdout, {Key? key}) : super(key: key);
+  const OutputWidget(this.stdout, {super.key});
 
   @override
   State<StatefulWidget> createState() => _OutputState();

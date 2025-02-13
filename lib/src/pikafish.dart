@@ -1,63 +1,28 @@
 import 'dart:async';
-import 'dart:isolate';
+import 'dart:io';
 
-import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
-import 'package:logging/logging.dart';
 
-import 'ffi.dart';
 import 'pikafish_state.dart';
-
-final _logger = Logger('Pikafish');
+import 'engine/engine_interface.dart';
+import 'engine/ffi_engine.dart';
+import 'engine/process_engine.dart';
 
 /// A wrapper for C++ engine.
 class Pikafish {
   final Completer<Pikafish>? completer;
-
+  final PikafishEngine _engine;
   final _state = _PikafishState();
-  final _stdoutController = StreamController<String>.broadcast();
-  final _mainPort = ReceivePort();
-  final _stdoutPort = ReceivePort();
 
-  late StreamSubscription _mainSubscription;
-  late StreamSubscription _stdoutSubscription;
-
-  Pikafish._({this.completer}) {
-    _mainSubscription =
-        _mainPort.listen((message) => _cleanUp(message is int ? message : 1));
-    _stdoutSubscription = _stdoutPort.listen((message) {
-      if (message is String) {
-        _logger.finest('The stdout isolate sent $message');
-        _stdoutController.sink.add(message);
-      } else {
-        _logger.fine('The stdout isolate sent $message');
-      }
-    });
-    compute(_spawnIsolates, [_mainPort.sendPort, _stdoutPort.sendPort]).then(
-      (success) {
-        final state = success ? PikafishState.ready : PikafishState.error;
-        _logger.fine('The init isolate reported $state');
-        _state._setValue(state);
-        if (state == PikafishState.ready) {
-          completer?.complete(this);
-        }
-      },
-      onError: (error) {
-        _logger.severe('The init isolate encountered an error $error');
-        _cleanUp(1);
-      },
-    );
+  Pikafish._({this.completer}) : _engine = Platform.isIOS ? FFIPikafishEngine() : ProcessPikafishEngine() {
+    _initEngine();
   }
 
   static Pikafish? _instance;
 
-  /// Creates a C++ engine.
-  ///
-  /// This may throws a [StateError] if an active instance is being used.
-  /// Owner must [dispose] it before a new instance can be created.
   factory Pikafish() {
     if (_instance != null) {
-      throw new StateError('Multiple instances are not supported, yet.');
+      throw StateError('Multiple instances are not supported, yet.');
     }
 
     _instance = Pikafish._();
@@ -68,7 +33,7 @@ class Pikafish {
   ValueListenable<PikafishState> get state => _state;
 
   /// The standard output stream.
-  Stream<String> get stdout => _stdoutController.stream;
+  Stream<String> get stdout => _engine.output;
 
   /// The standard input sink.
   set stdin(String line) {
@@ -76,27 +41,25 @@ class Pikafish {
     if (stateValue != PikafishState.ready) {
       throw StateError('Pikafish is not ready ($stateValue)');
     }
-
-    final pointer = '$line\n'.toNativeUtf8();
-    nativeStdinWrite(pointer);
-    calloc.free(pointer);
+    _engine.writeCommand(line);
   }
 
   /// Stops the C++ engine.
   void dispose() {
-    stdin = 'quit';
+    _engine.dispose();
+    _state._setValue(PikafishState.disposed);
+    _instance = null;
   }
 
-  void _cleanUp(int exitCode) {
-    _stdoutController.close();
-
-    _mainSubscription.cancel();
-    _stdoutSubscription.cancel();
-
-    _state._setValue(
-        exitCode == 0 ? PikafishState.disposed : PikafishState.error);
-
-    _instance = null;
+  Future<void> _initEngine() async {
+    try {
+      await _engine.init();
+      _state._setValue(PikafishState.ready);
+      completer?.complete(this);
+    } catch (error) {
+      _state._setValue(PikafishState.error);
+      completer?.completeError(error);
+    }
   }
 }
 
@@ -114,8 +77,7 @@ Future<Pikafish> pikafishAsync() {
   return completer.future;
 }
 
-class _PikafishState extends ChangeNotifier
-    implements ValueListenable<PikafishState> {
+class _PikafishState extends ChangeNotifier implements ValueListenable<PikafishState> {
   PikafishState _value = PikafishState.starting;
 
   @override
@@ -126,55 +88,4 @@ class _PikafishState extends ChangeNotifier
     _value = v;
     notifyListeners();
   }
-}
-
-void _isolateMain(SendPort mainPort) {
-  final exitCode = nativeMain();
-  mainPort.send(exitCode);
-
-  _logger.fine('nativeMain returns $exitCode');
-}
-
-void _isolateStdout(SendPort stdoutPort) {
-  String previous = '';
-
-  while (true) {
-    final pointer = nativeStdoutRead();
-
-    if (pointer.address == 0) {
-      _logger.fine('nativeStdoutRead returns NULL');
-      return;
-    }
-
-    final data = previous + pointer.toDartString();
-    final lines = data.split('\n');
-    previous = lines.removeLast();
-    for (final line in lines) {
-      stdoutPort.send(line);
-    }
-  }
-}
-
-Future<bool> _spawnIsolates(List<SendPort> mainAndStdout) async {
-  final initResult = nativeInit();
-  if (initResult != 0) {
-    _logger.severe('initResult=$initResult');
-    return false;
-  }
-
-  try {
-    await Isolate.spawn(_isolateStdout, mainAndStdout[1]);
-  } catch (error) {
-    _logger.severe('Failed to spawn stdout isolate: $error');
-    return false;
-  }
-
-  try {
-    await Isolate.spawn(_isolateMain, mainAndStdout[0]);
-  } catch (error) {
-    _logger.severe('Failed to spawn main isolate: $error');
-    return false;
-  }
-
-  return true;
 }
