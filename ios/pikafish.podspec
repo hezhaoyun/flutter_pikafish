@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   s.source           = { :git => pubspec['repository'], :tag => s.version.to_s }
   s.source_files     = 'Classes/**/*', 'FlutterPikafish/*', 'Pikafish/src/**/*'
   s.public_header_files = 'Classes/**/*.h'
-  # s.exclude_files  = 'Pikafish/src/incbin/UNLICENCE'
+  s.exclude_files    = 'Pikafish/src/incbin/UNLICENCE'
   s.dependency       'Flutter'
   s.platform         = :ios, '12.0'
   s.ios.deployment_target  = '12.0'
