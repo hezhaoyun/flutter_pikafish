@@ -1,11 +1,11 @@
 name: pikafish_engine
 description: The Flutter plugin for PIKAFISH (base on Stockfish), A well-known Chinese chess open source engine.
-version: 1.0.4
+version: 1.0.5
 repository: https://github.com/hezhaoyun/flutter_pikafish
 homepage: https://mdevs.cn
 
 environment:
-  sdk: '>=2.17.0 <3.0.0'
+  sdk: '>=2.17.0 <4.0.0'
   flutter: '>=3.0.0'
 
 dependencies:
@@ -21,8 +21,5 @@ dev_dependencies:
 flutter:
   plugin:
     platforms:
-      android:
-        package: cn.mdevs.cchess.engine.pikafish
-        pluginClass: PikafishPlugin
       ios:
         pluginClass: PikafishPlugin
