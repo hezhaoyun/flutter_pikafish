@@ -5,7 +5,7 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
-  - pikafish (1.6.0):
+  - pikafish (1.0.5):
     - Flutter
 
 DEPENDENCIES:
@@ -28,7 +28,7 @@ SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
-  pikafish: 2e00880b8f6aaf480bbe6bb0aa21267193037456
+  pikafish: 0ca3fb46180dc14ea3f8c9ac8b1613b3c99a258f
 
 PODFILE CHECKSUM: c4c93c5f6502fe2754f48404d3594bf779584011
 
